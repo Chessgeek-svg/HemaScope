@@ -2,6 +2,7 @@
 from pathlib import Path
 from typing import Iterator, NamedTuple
 import pandas as pd
+import json
 from sklearn.model_selection import train_test_split
 
 
@@ -146,6 +147,21 @@ def ingest_wbcatt(root: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
     attributes["source"] = "wbcatt"
     return metadata, attributes
 
+RAABIN_LABEL_MAP = {
+    1: "Segmented Neutrophil",   # Raabin doesn't split band/seg, default to seg
+    2: "Lymphocyte",
+    3: "Monocyte",
+    4: "Eosinophil",
+    5: "Basophil",
+}
+
+def ingest_raabin(root: Path) -> Iterator[RawRow]:
+    for subset in ("Train", "Test"):
+        with open(root / f"{subset}.json") as f:
+            data = json.load(f)
+            
+        for filename, code in data.items():
+            yield RawRow(image_path= root / subset / filename, source_dataset="raabin", original_label=code)
 
 def assign_splits(metadata: pd.DataFrame, val_frac: float, test_frac: float) -> None:
     """Fill the 'split' column in place for rows that don't already have one.
@@ -180,12 +196,15 @@ def main() -> None:
     LABEL_MAPS = {
         "mll23": MLL23_LABEL_MAP,
         "hrls":  HRLS_LABEL_MAP,
+        "raabin": RAABIN_LABEL_MAP
     }
 
     # --- folder-labeled sources: no attributes, split assigned by us ---
     raw: list[RawRow] = []
     raw.extend(ingest_mll23(data_root / "MLL23"))
     raw.extend(ingest_hrls(data_root / "HRLS" / "Labelled"))
+    raw.extend(ingest_raabin(data_root / "Raabin-WBC"))
+    
 
     folder_rows = [
         {
