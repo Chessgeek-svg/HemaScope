@@ -83,69 +83,60 @@ WBCATT_ATTRIBUTE_COLUMNS = [
     "cytoplasm_colour", "granule_type", "granule_colour", "granularity",
 ]
 
-# WB-CAtt label -> HemaScope class. Neutrophil is handled separately (band/seg).
-WBCATT_LABEL_MAP: dict[str, str] = {
-    "Basophil": "Basophil",
-    "Eosinophil": "Eosinophil",
-    "Lymphocyte": "Lymphocyte",
-    "Monocyte": "Monocyte",
+# Acevedo/PBC class -> HemaScope class. The neutrophil and ig folders are mixed,
+# so their real class comes from the filename prefix (BNE/SNE, MMY/MY/PMY), not the folder
+ACEVEDO_LABEL_MAP: dict[str, str] = {
+    "basophil": "Basophil",
+    "eosinophil": "Eosinophil",
+    "erythroblast": "Erythroblast",
+    "lymphocyte": "Lymphocyte",
+    "monocyte": "Monocyte",
+    "platelet": "Giant Platelet",
+    "BNE": "Band Neutrophil",
+    "SNE": "Segmented Neutrophil",
+    "NEUTROPHIL": "Segmented Neutrophil",
+    "MMY": "Metamyelocyte",
+    "MY": "Myelocyte",
+    "PMY": "Promyelocyte",
 }
 
+# folders whose real class is in the filename prefix, not the folder name
+ACEVEDO_PREFIX_FOLDERS = {"neutrophil", "ig"}
 
-def wbcatt_label(img_name: str, label: str) -> str:
-    """Map a WB-CAtt image to a HemaScope class.
 
-    Neutrophils are all labelled "Neutrophil"; the filename prefix splits band
-    (BNE_) from segmented (SNE_ and the ~50 NEUTROPHIL_, which are all seg).
+def ingest_acevedo(root: Path) -> Iterator[RawRow]:
+    """Yield one RawRow per Acevedo/PBC image (folder-labeled, .jpg).
+
+    In the neutrophil and ig folders the class is in the filename prefix; the
+    generic IG_ files aren't sub-typed, so they're skipped.
     """
-    if label == "Neutrophil":
-        return "Band Neutrophil" if img_name.startswith("BNE_") else "Segmented Neutrophil"
-    return WBCATT_LABEL_MAP[label]
+    for folder in root.iterdir():
+        if not folder.is_dir() or folder.name == "labels":
+            continue
+        for image in folder.glob("*.jpg"):
+            if folder.name in ACEVEDO_PREFIX_FOLDERS:
+                label = image.name.split("_")[0]
+                if label == "IG":
+                    continue
+            else:
+                label = folder.name
+            yield RawRow(image_path=image, source_dataset="acevedo", original_label=label)
 
 
-def ingest_wbcatt(root: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Ingest WB-CAtt. Returns (metadata, attributes), joined on image_path.
+def wbcatt_attributes(root: Path) -> pd.DataFrame:
+    """Read WB-CAtt's per-image attribute labels (an annotation layer on Acevedo).
 
-    The three CSVs are the train/val/test split. Only 5 classes are annotated.
+    Joined to the metadata on image_path. Only the 5 annotated classes appear.
     """
-    split_files = {
-        "train": "pbc_attr_v1_train.csv",
-        "val": "pbc_attr_v1_val.csv",
-        "test": "pbc_attr_v1_test.csv",
-    }
-
-    frames = []
-    for split, filename in split_files.items():
-        df = pd.read_csv(root / "labels" / filename)
-        df["split"] = split
-        frames.append(df)
-    data = pd.concat(frames, ignore_index=True)
-
-    # rebuild the on-disk path (the CSV `path` points at the original PBC layout)
+    files = ["pbc_attr_v1_train.csv", "pbc_attr_v1_val.csv", "pbc_attr_v1_test.csv"]
+    data = pd.concat([pd.read_csv(root / "labels" / f) for f in files], ignore_index=True)
     data["image_path"] = [
         str(root / label.lower() / img_name)
         for label, img_name in zip(data["label"], data["img_name"])
     ]
-    data["hemascope_label"] = [
-        wbcatt_label(img_name, label)
-        for img_name, label in zip(data["img_name"], data["label"])
-    ]
-
-    missing = [p for p in data["image_path"] if not Path(p).exists()]
-    if missing:
-        raise FileNotFoundError(f"{len(missing)} WB-CAtt paths not found, e.g. {missing[:3]}")
-
-    metadata = pd.DataFrame({
-        "image_path": data["image_path"],
-        "source_dataset": "wbcatt",
-        "original_label": data["label"],
-        "hemascope_label": data["hemascope_label"],
-        "split": data["split"],
-    })
-
     attributes = data[["image_path", *WBCATT_ATTRIBUTE_COLUMNS]].copy()
     attributes["source"] = "wbcatt"
-    return metadata, attributes
+    return attributes
 
 RAABIN_LABEL_MAP = {
     1: "Segmented Neutrophil",   # Raabin doesn't split band/seg, default to seg
@@ -196,15 +187,15 @@ def main() -> None:
     LABEL_MAPS = {
         "mll23": MLL23_LABEL_MAP,
         "hrls":  HRLS_LABEL_MAP,
-        "raabin": RAABIN_LABEL_MAP
+        "raabin": RAABIN_LABEL_MAP,
+        "acevedo": ACEVEDO_LABEL_MAP,
     }
 
-    # --- folder-labeled sources: no attributes, split assigned by us ---
     raw: list[RawRow] = []
     raw.extend(ingest_mll23(data_root / "MLL23"))
     raw.extend(ingest_hrls(data_root / "HRLS" / "Labelled"))
     raw.extend(ingest_raabin(data_root / "Raabin-WBC"))
-    
+    raw.extend(ingest_acevedo(data_root / "PBC_dataset_WBCAtt"))
 
     folder_rows = [
         {
@@ -218,14 +209,13 @@ def main() -> None:
     ]
     metadata = pd.DataFrame(folder_rows)
 
-    # --- file-labeled sources: ship their own split and attribute labels ---
-    wbcatt_metadata, wbcatt_attributes = ingest_wbcatt(data_root / "PBC_dataset_WBCAtt")
-    metadata = pd.concat([metadata, wbcatt_metadata], ignore_index=True)
-
     assign_splits(metadata, val_frac=0.15, test_frac=0.15)
 
+    # WB-CAtt attribute labels sit on the Acevedo images, joined on image_path
+    attributes = wbcatt_attributes(data_root / "PBC_dataset_WBCAtt")
+
     metadata.to_csv("metadata/metadata.csv", index=False)
-    wbcatt_attributes.to_csv("metadata/attributes.csv", index=False)
+    attributes.to_csv("metadata/attributes.csv", index=False)
 
 
 if __name__ == "__main__":
