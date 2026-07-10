@@ -154,6 +154,44 @@ def ingest_raabin(root: Path) -> Iterator[RawRow]:
         for filename, code in data.items():
             yield RawRow(image_path= root / subset / filename, source_dataset="raabin", original_label=code)
 
+YARIKAN_LABEL_MAP = {
+    "segmented_neutrophil": "Segmented Neutrophil",
+    "band_neutrophil": "Band Neutrophil",
+    "lymphocyte": "Lymphocyte",
+    "reactive_lymphocyte": "Reactive Lymphocyte",
+    "monocyte": "Monocyte",
+    "eosinophil": "Eosinophil",
+    "basophil": "Basophil",
+    "blast": "Blast",
+    "myelocyte": "Myelocyte",
+    "metamyelocyte": "Metamyelocyte",
+    "erythroblast": "Erythroblast",
+    "giant_platelet": "Giant Platelet",
+    "platelet_cluster": "Platelet Cluster",
+}
+
+def ingest_yarikan(root: Path) -> pd.DataFrame:
+    """Ingest Yarikan/Koc. CSV-labeled, ships its own patient-level split.
+
+    The on-disk class folders are already the HemaScope names; the CSV `path`
+    gives the physical train/val/test folder, which can differ from the split
+    column since the split is re-assigned per patient.
+    """
+    data = pd.read_csv(root / "metadata_with_patient_level_splits.csv")
+    hemascope = data["cell_type"].map(YARIKAN_LABEL_MAP)
+    physical = data["path"].str.split("/").str[0]
+    data["image_path"] = [
+        str(root / "dataset" / phys / label / name)
+        for phys, label, name in zip(physical, hemascope, data["image_name"])
+    ]
+    return pd.DataFrame({
+        "image_path": data["image_path"],
+        "source_dataset": "yarikan",
+        "original_label": data["cell_type"],
+        "hemascope_label": hemascope,
+        "split": data["split"].replace({"validation": "val"}),
+    })
+
 def assign_splits(metadata: pd.DataFrame, val_frac: float, test_frac: float) -> None:
     """Fill the 'split' column in place for rows that don't already have one.
 
@@ -208,6 +246,9 @@ def main() -> None:
         for r in raw
     ]
     metadata = pd.DataFrame(folder_rows)
+
+    # Yarikan ships its own patient-level split, so it bypasses assign_splits
+    metadata = pd.concat([metadata, ingest_yarikan(data_root / "yarikan")], ignore_index=True)
 
     assign_splits(metadata, val_frac=0.15, test_frac=0.15)
 
