@@ -219,3 +219,5 @@ __marimo__/
 
 /data
 /metadata
+/labeling/cache
+/labeling/tasks.json

@@ -1,0 +1,97 @@
+<!-- Label Studio config for HemaScope morphological attribute labeling.
+     Attribute names and Choice values are taken verbatim from attributes.csv
+     (the WB-CAtt schema) so manual labels are interchangeable with WB-CAtt's.
+     unexpected_case is an extra flag for cells that look mislabeled/atypical. -->
+<View style="display: flex;">
+
+  <View style="flex: 40%; padding-right: 1em;">
+    <Image name="image" value="$image" zoom="true" maxWidth="100%"/>
+    <Header value="Class (given): $hemascope_label"/>
+  </View>
+
+  <View style="flex: 30%; padding-right: 1em;">
+    <Header value="Nucleus Shape"/>
+    <Choices name="nucleus_shape" toName="image" choice="single" required="true">
+      <Choice value="segmented-multilobed"/>
+      <Choice value="segmented-bilobed"/>
+      <Choice value="unsegmented-band"/>
+      <Choice value="unsegmented-round"/>
+      <Choice value="unsegmented-indented"/>
+      <Choice value="irregular"/>
+    </Choices>
+
+    <Header value="Chromatin Density"/>
+    <Choices name="chromatin_density" toName="image" choice="single" required="true">
+      <Choice value="loosely"/>
+      <Choice value="densely"/>
+    </Choices>
+
+    <Header value="Nuclear-cytoplasmic Ratio"/>
+    <Choices name="nuclear_cytoplasmic_ratio" toName="image" choice="single" required="true">
+      <Choice value="high"/>
+      <Choice value="low"/>
+    </Choices>
+
+    <Header value="Cytoplasm Colour"/>
+    <Choices name="cytoplasm_colour" toName="image" choice="single" required="true">
+      <Choice value="light blue"/>
+      <Choice value="blue"/>
+      <Choice value="purple blue"/>
+    </Choices>
+
+    <Header value="Cytoplasm Texture"/>
+    <Choices name="cytoplasm_texture" toName="image" choice="single" required="true">
+      <Choice value="clear"/>
+      <Choice value="frosted"/>
+    </Choices>
+
+    <Header value="Cytoplasm Vacuole"/>
+    <Choices name="cytoplasm_vacuole" toName="image" choice="single" required="true">
+      <Choice value="yes"/>
+      <Choice value="no"/>
+    </Choices>
+  </View>
+
+  <View style="flex: 30%;">
+    <Header value="Granularity"/>
+    <Choices name="granularity" toName="image" choice="single" required="true">
+      <Choice value="yes"/>
+      <Choice value="no"/>
+    </Choices>
+
+    <Header value="Granule Colour"/>
+    <Choices name="granule_colour" toName="image" choice="single" required="true">
+      <Choice value="pink"/>
+      <Choice value="red"/>
+      <Choice value="purple"/>
+      <Choice value="nil"/>
+    </Choices>
+
+    <Header value="Granule Type"/>
+    <Choices name="granule_type" toName="image" choice="single" required="true">
+      <Choice value="small"/>
+      <Choice value="round"/>
+      <Choice value="coarse"/>
+      <Choice value="nil"/>
+    </Choices>
+
+    <Header value="Cell Size"/>
+    <Choices name="cell_size" toName="image" choice="single" required="true">
+      <Choice value="small"/>
+      <Choice value="big"/>
+    </Choices>
+
+    <Header value="Cell Shape"/>
+    <Choices name="cell_shape" toName="image" choice="single" required="true">
+      <Choice value="round"/>
+      <Choice value="irregular"/>
+    </Choices>
+
+    <Header value="Unexpected Case"/>
+    <Choices name="unexpected_case" toName="image" choice="single" required="true">
+      <Choice value="yes"/>
+      <Choice value="no"/>
+    </Choices>
+  </View>
+
+</View>
