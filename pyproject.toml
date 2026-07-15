@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hemascope"
+version = "0.1.0"
+description = "Concept bottleneck model for hematology morphology identification"
+requires-python = ">=3.10"
+# Runtime dependencies are tracked in requirements.txt, not here, so torch can be
+# installed against the correct CUDA index rather than a naive pin.
+
+[tool.setuptools.packages.find]
+# Only package the hemascope/ library; data/, labeling/, scripts/ are not packages.
+include = ["hemascope*"]

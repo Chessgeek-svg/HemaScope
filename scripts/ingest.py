@@ -4,6 +4,7 @@ from typing import Iterator, NamedTuple
 import pandas as pd
 import json
 from sklearn.model_selection import train_test_split
+from hemascope.vocab import ATTRIBUTES 
 
 
 class RawRow(NamedTuple):
@@ -75,14 +76,6 @@ HRLS_LABEL_MAP: dict[str, str] = {
     "Normoblast": "Erythroblast",
 }
 
-
-# WB-CAtt's 11 attribute columns, kept as-is from the source CSVs.
-WBCATT_ATTRIBUTE_COLUMNS = [
-    "cell_size", "cell_shape", "nucleus_shape", "nuclear_cytoplasmic_ratio",
-    "chromatin_density", "cytoplasm_vacuole", "cytoplasm_texture",
-    "cytoplasm_colour", "granule_type", "granule_colour", "granularity",
-]
-
 # Acevedo/PBC class -> HemaScope class. The neutrophil and ig folders are mixed,
 # so their real class comes from the filename prefix (BNE/SNE, MMY/MY/PMY), not the folder
 ACEVEDO_LABEL_MAP: dict[str, str] = {
@@ -134,7 +127,7 @@ def wbcatt_attributes(root: Path) -> pd.DataFrame:
         str(root / label.lower() / img_name)
         for label, img_name in zip(data["label"], data["img_name"])
     ]
-    attributes = data[["image_path", *WBCATT_ATTRIBUTE_COLUMNS]].copy()
+    attributes = data[["image_path", *ATTRIBUTES]].copy()
     attributes["source"] = "wbcatt"
     return attributes
 
