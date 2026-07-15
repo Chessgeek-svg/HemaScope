@@ -45,6 +45,11 @@ VALUE_TO_INDEX: dict[str, dict[str, int]] = {
     for attr, values in ATTRIBUTE_VOCAB.items()
 }
 
+# The current 6 classes in alphabetical order. As more are added, they can be appended to the end
+CLASSES: list[str] = ["Band Neutrophil", "Basophil", "Eosinophil", "Lymphocyte", "Monocyte", "Segmented Neutrophil"]
+
+CLASS_TO_INDEX: dict[str, int] = {c: i for i, c in enumerate(CLASSES)}
+
 
 def num_classes(attribute: str) -> int:
     """Number of output units the given attribute's classification head needs."""
