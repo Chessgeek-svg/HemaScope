@@ -1,14 +1,18 @@
 """Ingest raw datasets into a single standardized metadata file."""
+
+import json
 from pathlib import Path
 from typing import Iterator, NamedTuple
+
 import pandas as pd
-import json
 from sklearn.model_selection import train_test_split
-from hemascope.vocab import ATTRIBUTES 
+
+from hemascope.vocab import ATTRIBUTES
 
 
 class RawRow(NamedTuple):
     """One image as emitted by an adapter, before taxonomy mapping/splitting."""
+
     image_path: Path
     source_dataset: str
     original_label: str
@@ -25,8 +29,9 @@ def ingest_mll23(root: Path) -> Iterator[RawRow]:
             continue
         # images live in an inner folder of the same name (class/class/*.tif)
         for image in (folder / folder.name).glob("*.tif"):
-            yield RawRow(image_path=image, source_dataset="mll23", original_label=folder.name)
-        
+            yield RawRow(
+                image_path=image, source_dataset="mll23", original_label=folder.name
+            )
 
 
 # original MLL23 folder name -> one of the 17 HemaScope classes
@@ -37,7 +42,8 @@ MLL23_LABEL_MAP: dict[str, str] = {
     "lymphocyte": "Lymphocyte",
     "lymphocyte_large_granular": "Lymphocyte",
     "lymphocyte_neoplastic": "Blast",
-    "lymphocyte_reactive": "Reactive Lymphocyte",   # NOTE: MLL23 count (33) is unreliable; may drop later
+    # NOTE: MLL23 count for reactive lymphs (33) is unreliable; may drop later
+    "lymphocyte_reactive": "Reactive Lymphocyte",  
     "metamyelocyte": "Metamyelocyte",
     "monocyte": "Monocyte",
     "myeloblast": "Blast",
@@ -48,8 +54,9 @@ MLL23_LABEL_MAP: dict[str, str] = {
     "plasma_cell": "Plasma Cell",
     "promyelocyte": "Promyelocyte",
     "promyelocyte_atypical": "Promyelocyte",
-    "smudge_cell": "Smudge Cell"
+    "smudge_cell": "Smudge Cell",
 }
+
 
 def ingest_hrls(root: Path) -> Iterator[RawRow]:
     """Yield one RawRow per image in the HRLS dataset.
@@ -61,15 +68,18 @@ def ingest_hrls(root: Path) -> Iterator[RawRow]:
         if not folder.is_dir() or "MACOSX" in folder.name:
             continue
         for image in folder.glob("*.bmp"):
-            yield RawRow(image_path=image, source_dataset="hrls", original_label=folder.name)
-        
+            yield RawRow(
+                image_path=image, source_dataset="hrls", original_label=folder.name
+            )
+
+
 # original HRLS folder name -> one of the 8 HemaScope classes
 HRLS_LABEL_MAP: dict[str, str] = {
     "Basophile": "Basophil",
     "Eosinophile": "Eosinophil",
     "Lymphoblast": "Blast",
     "Lymphocyte": "Lymphocyte",
-    "Monocyte": "Monocyte",  
+    "Monocyte": "Monocyte",
     "Myeloblast": "Blast",
     "Neutrophile Band": "Band Neutrophil",
     "Neutrophile Segment": "Segmented Neutrophil",
@@ -77,7 +87,7 @@ HRLS_LABEL_MAP: dict[str, str] = {
 }
 
 # Acevedo/PBC class -> HemaScope class. The neutrophil and ig folders are mixed,
-# so their real class comes from the filename prefix (BNE/SNE, MMY/MY/PMY), not the folder
+# their real class comes from the filename prefix (BNE/SNE, MMY/MY/PMY), not the folder
 ACEVEDO_LABEL_MAP: dict[str, str] = {
     "basophil": "Basophil",
     "eosinophil": "Eosinophil",
@@ -113,7 +123,9 @@ def ingest_acevedo(root: Path) -> Iterator[RawRow]:
                     continue
             else:
                 label = folder.name
-            yield RawRow(image_path=image, source_dataset="acevedo", original_label=label)
+            yield RawRow(
+                image_path=image, source_dataset="acevedo", original_label=label
+            )
 
 
 def wbcatt_attributes(root: Path) -> pd.DataFrame:
@@ -122,7 +134,9 @@ def wbcatt_attributes(root: Path) -> pd.DataFrame:
     Joined to the metadata on image_path. Only the 5 annotated classes appear.
     """
     files = ["pbc_attr_v1_train.csv", "pbc_attr_v1_val.csv", "pbc_attr_v1_test.csv"]
-    data = pd.concat([pd.read_csv(root / "labels" / f) for f in files], ignore_index=True)
+    data = pd.concat(
+        [pd.read_csv(root / "labels" / f) for f in files], ignore_index=True
+    )
     data["image_path"] = [
         str(root / label.lower() / img_name)
         for label, img_name in zip(data["label"], data["img_name"])
@@ -131,21 +145,28 @@ def wbcatt_attributes(root: Path) -> pd.DataFrame:
     attributes["source"] = "wbcatt"
     return attributes
 
+
 RAABIN_LABEL_MAP = {
-    1: "Segmented Neutrophil",   # Raabin doesn't split band/seg, default to seg
+    1: "Segmented Neutrophil",  # Raabin doesn't split band/seg, default to seg
     2: "Lymphocyte",
     3: "Monocyte",
     4: "Eosinophil",
     5: "Basophil",
 }
 
+
 def ingest_raabin(root: Path) -> Iterator[RawRow]:
     for subset in ("Train", "Test"):
         with open(root / f"{subset}.json") as f:
             data = json.load(f)
-            
+
         for filename, code in data.items():
-            yield RawRow(image_path= root / subset / filename, source_dataset="raabin", original_label=code)
+            yield RawRow(
+                image_path=root / subset / filename,
+                source_dataset="raabin",
+                original_label=code,
+            )
+
 
 YARIKAN_LABEL_MAP = {
     "segmented_neutrophil": "Segmented Neutrophil",
@@ -163,6 +184,7 @@ YARIKAN_LABEL_MAP = {
     "platelet_cluster": "Platelet Cluster",
 }
 
+
 def ingest_yarikan(root: Path) -> pd.DataFrame:
     """Ingest Yarikan/Koc. CSV-labeled, ships its own patient-level split.
 
@@ -177,13 +199,16 @@ def ingest_yarikan(root: Path) -> pd.DataFrame:
         str(root / "dataset" / phys / label / name)
         for phys, label, name in zip(physical, hemascope, data["image_name"])
     ]
-    return pd.DataFrame({
-        "image_path": data["image_path"],
-        "source_dataset": "yarikan",
-        "original_label": data["cell_type"],
-        "hemascope_label": hemascope,
-        "split": data["split"].replace({"validation": "val"}),
-    })
+    return pd.DataFrame(
+        {
+            "image_path": data["image_path"],
+            "source_dataset": "yarikan",
+            "original_label": data["cell_type"],
+            "hemascope_label": hemascope,
+            "split": data["split"].replace({"validation": "val"}),
+        }
+    )
+
 
 def assign_splits(metadata: pd.DataFrame, val_frac: float, test_frac: float) -> None:
     """Fill the 'split' column in place for rows that don't already have one.
@@ -212,12 +237,13 @@ def assign_splits(metadata: pd.DataFrame, val_frac: float, test_frac: float) -> 
     metadata.loc[val_idx, "split"] = "val"
     metadata.loc[test_idx, "split"] = "test"
 
+
 def main() -> None:
     data_root = Path("data")
 
     LABEL_MAPS = {
         "mll23": MLL23_LABEL_MAP,
-        "hrls":  HRLS_LABEL_MAP,
+        "hrls": HRLS_LABEL_MAP,
         "raabin": RAABIN_LABEL_MAP,
         "acevedo": ACEVEDO_LABEL_MAP,
     }
@@ -241,7 +267,9 @@ def main() -> None:
     metadata = pd.DataFrame(folder_rows)
 
     # Yarikan ships its own patient-level split, so it bypasses assign_splits
-    metadata = pd.concat([metadata, ingest_yarikan(data_root / "yarikan")], ignore_index=True)
+    metadata = pd.concat(
+        [metadata, ingest_yarikan(data_root / "yarikan")], ignore_index=True
+    )
 
     assign_splits(metadata, val_frac=0.15, test_frac=0.15)
 

@@ -11,6 +11,7 @@ so WB-CAtt's ``attributes.csv`` and the manually labeled ``manual_attributes.csv
 share one encoding. The config's ``unexpected_case`` flag is a QC field, not a
 morphological attribute, and is deliberately excluded here.
 """
+
 from __future__ import annotations
 
 import pandas as pd
@@ -23,8 +24,12 @@ ATTRIBUTE_VOCAB: dict[str, list[str]] = {
     "cell_size": ["small", "big"],
     "cell_shape": ["round", "irregular"],
     "nucleus_shape": [
-        "segmented-multilobed", "segmented-bilobed", "unsegmented-band",
-        "unsegmented-round", "unsegmented-indented", "irregular",
+        "segmented-multilobed",
+        "segmented-bilobed",
+        "unsegmented-band",
+        "unsegmented-round",
+        "unsegmented-indented",
+        "irregular",
     ],
     "nuclear_cytoplasmic_ratio": ["high", "low"],
     "chromatin_density": ["loosely", "densely"],
@@ -45,8 +50,16 @@ VALUE_TO_INDEX: dict[str, dict[str, int]] = {
     for attr, values in ATTRIBUTE_VOCAB.items()
 }
 
-# The current 6 classes in alphabetical order. As more are added, they can be appended to the end
-CLASSES: list[str] = ["Band Neutrophil", "Basophil", "Eosinophil", "Lymphocyte", "Monocyte", "Segmented Neutrophil"]
+# The current 6 classes in alphabetical order. 
+# As more are added, they can be appended to the end
+CLASSES: list[str] = [
+    "Band Neutrophil",
+    "Basophil",
+    "Eosinophil",
+    "Lymphocyte",
+    "Monocyte",
+    "Segmented Neutrophil",
+]
 
 CLASS_TO_INDEX: dict[str, int] = {c: i for i, c in enumerate(CLASSES)}
 

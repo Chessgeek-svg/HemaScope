@@ -1,0 +1,2 @@
+[lint]
+select = ["E", "F", "I"]   # E/F = pyflakes/pycodestyle basics, I = import sorting
