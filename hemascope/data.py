@@ -8,9 +8,10 @@ from hemascope.vocab import ATTRIBUTES, CLASS_TO_INDEX, VALUE_TO_INDEX
 
 
 class MorphologyDataset(Dataset):
-    def __init__(self, attributes_filepath, metadata_filepath):
+    def __init__(self, attributes_filepath, metadata_filepath, split=None):
         self.attributes_filepath = attributes_filepath
         self.metadata_filepath = metadata_filepath
+        self.split = split
 
         df = pd.read_csv(self.attributes_filepath)
         metadata = pd.read_csv(self.metadata_filepath)
@@ -18,6 +19,11 @@ class MorphologyDataset(Dataset):
 
         for attr in ATTRIBUTES:
             df[attr] = df[attr].map(VALUE_TO_INDEX[attr])
+
+        if self.split is not None:
+            df = df[df["split"] == self.split]
+
+        df = df.reset_index(drop=True)
         self.df = df
 
         self.transform = v2.Compose(
@@ -43,11 +49,8 @@ class MorphologyDataset(Dataset):
         # class target: string -> canonical int index
         class_target = CLASS_TO_INDEX[row["hemascope_label"]]
 
-        # image tensor still to come
-        image_tensor = None
         path = row["image_path"]
         image = Image.open(path).convert("RGB")
-        image.resize([224, 224])
         image_tensor = self.transform(image)
 
         return image_tensor, attr_targets, class_target
