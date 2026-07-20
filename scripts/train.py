@@ -6,6 +6,7 @@ from hemascope.model import Model
 from hemascope.vocab import ATTRIBUTES
 
 ATTR_PATH, METADATA_PATH = "metadata/attributes.csv", "metadata/metadata.csv"
+ACCUM_STEPS = 4
 trainset = MorphologyDataset(ATTR_PATH, METADATA_PATH, split="train")
 valset = MorphologyDataset(ATTR_PATH, METADATA_PATH, split="val")
 testset = MorphologyDataset(ATTR_PATH, METADATA_PATH, split="test")
@@ -18,6 +19,7 @@ model.to(device)
 model.train()  # freeze backbone, set heads to train mode
 loader = torch.utils.data.DataLoader(trainset, batch_size=8, shuffle=True)
 val_loader = torch.utils.data.DataLoader(valset, batch_size=32, shuffle=False)
+scaler = torch.amp.GradScaler('cuda')  # type: ignore
 
 
 def compute_loss(attr_logits, class_logits, attr_targets, class_targets):
@@ -64,21 +66,34 @@ for epoch in range(2):
         attr_targets = attr_targets.to(device)
         class_targets = class_targets.to(device)
 
-        optimizer.zero_grad()
-        attr_logits, class_logits = model(images)
-        loss = compute_loss(attr_logits, class_logits, attr_targets, class_targets)
-        loss.backward()
-        optimizer.step()
+        with torch.amp.autocast('cuda'):  # type: ignore
+            attr_logits, class_logits = model(images)
+            loss = compute_loss(attr_logits, class_logits, attr_targets, class_targets)
+            # scale each grad by 1/ACCUM so the accumulated grads 
+            # sum to one normal-size update
+            loss /= ACCUM_STEPS 
+        scaler.scale(loss).backward()
+        if i % ACCUM_STEPS == ACCUM_STEPS - 1:
+            scaler.step(optimizer)
+            scaler.update()
+            optimizer.zero_grad()
 
-        running_loss += loss.item()
+        running_loss += loss.item() * ACCUM_STEPS  # unscale for reporting
         if i % 50 == 0:
             print(
                 f"  step {i}/{len(loader)} avg_loss={running_loss / (i + 1):.4f}",
                 flush=True,
             )
 
+    # Flush any remaining gradients after the last batch 
+    # if it wasn't a multiple of ACCUM_STEPS
+    if len(loader) % ACCUM_STEPS != 0:    
+        scaler.step(optimizer)
+        scaler.update()
+        optimizer.zero_grad()
+
     avg_loss = running_loss / len(loader)
     attr_acc, class_acc = evaluate(model, val_loader, device)
     print(f"Epoch {epoch}: train_loss={avg_loss:.4f}  val_class_acc={class_acc:.3f}")
     for attr, acc in attr_acc.items():
-        print(f"    {attr:28s} {acc:.3f}")
+        print(f"    {attr:28s} {acc:.3f}")    
