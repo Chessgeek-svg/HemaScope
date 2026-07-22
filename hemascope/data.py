@@ -26,7 +26,19 @@ class MorphologyDataset(Dataset):
         df = df.reset_index(drop=True)
         self.df = df
 
-        self.transform = v2.Compose(
+        train_pipeline = v2.Compose(
+            [
+                v2.Resize((224, 224)),
+                v2.ToImage(),
+                v2.ToDtype(torch.float32, scale=True),
+                v2.RandomHorizontalFlip(p=0.5),
+                v2.RandomVerticalFlip(p=0.5),
+                #v2.RandomRotation(degrees=15), # requires a fill for corners
+                v2.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.02),
+                v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            ]
+        )
+        eval_pipeline = v2.Compose(
             [
                 v2.Resize((224, 224)),
                 v2.ToImage(),  # PIL -> uint8 tensor, Channel, Height, Width
@@ -36,6 +48,7 @@ class MorphologyDataset(Dataset):
                 v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ]
         )
+        self.transform = train_pipeline if self.split == "train" else eval_pipeline
 
     def __len__(self):
         return len(self.df)
