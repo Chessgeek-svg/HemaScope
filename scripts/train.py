@@ -21,7 +21,16 @@ optimizer = torch.optim.AdamW(
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model.to(device)
 model.train()  # freeze backbone, set heads to train mode
-loader = torch.utils.data.DataLoader(trainset, batch_size=8, shuffle=True)
+# Count each class once, then weight every sample by the inverse of its class size
+# so all classes are drawn about equally often (counters the eosinophil majority).
+class_counts = trainset.df["hemascope_label"].value_counts()
+sample_weights = [1.0 / class_counts[label] for label in trainset.df["hemascope_label"]]
+sampler = torch.utils.data.WeightedRandomSampler(
+    weights=sample_weights,  # class-balanced
+    num_samples=len(trainset),
+    replacement=True,
+)
+loader = torch.utils.data.DataLoader(trainset, batch_size=8, sampler=sampler)
 val_loader = torch.utils.data.DataLoader(valset, batch_size=32, shuffle=False)
 scaler = torch.amp.GradScaler("cuda")  # type: ignore
 
