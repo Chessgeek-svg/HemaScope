@@ -221,3 +221,5 @@ __marimo__/
 /metadata
 /labeling/cache
 /labeling/tasks.json
+/checkpoints
+/documents

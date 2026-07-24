@@ -1,9 +1,13 @@
+import os
+
 import torch
 import torch.nn.functional as F
 
 from hemascope.data import MorphologyDataset
 from hemascope.model import Model
 from hemascope.vocab import ATTRIBUTES
+
+torch.manual_seed(0)
 
 ATTR_PATH, METADATA_PATH = "metadata/attributes.csv", "metadata/metadata.csv"
 ACCUM_STEPS = 4
@@ -19,7 +23,7 @@ model.to(device)
 model.train()  # freeze backbone, set heads to train mode
 loader = torch.utils.data.DataLoader(trainset, batch_size=8, shuffle=True)
 val_loader = torch.utils.data.DataLoader(valset, batch_size=32, shuffle=False)
-scaler = torch.amp.GradScaler('cuda')  # type: ignore
+scaler = torch.amp.GradScaler("cuda")  # type: ignore
 
 
 def compute_loss(attr_logits, class_logits, attr_targets, class_targets):
@@ -58,7 +62,9 @@ def evaluate(model, loader, device):
     return attr_acc, class_correct / total
 
 
-for epoch in range(2):
+best_acc = 0.0
+os.makedirs("checkpoints", exist_ok=True)
+for epoch in range(20):
     model.train()  # evaluate() leaves the model in eval; flip heads back each epoch
     running_loss = 0.0
     for i, (images, attr_targets, class_targets) in enumerate(loader):
@@ -66,12 +72,12 @@ for epoch in range(2):
         attr_targets = attr_targets.to(device)
         class_targets = class_targets.to(device)
 
-        with torch.amp.autocast('cuda'):  # type: ignore
+        with torch.amp.autocast("cuda"):  # type: ignore
             attr_logits, class_logits = model(images)
             loss = compute_loss(attr_logits, class_logits, attr_targets, class_targets)
-            # scale each grad by 1/ACCUM so the accumulated grads 
+            # scale each grad by 1/ACCUM so the accumulated grads
             # sum to one normal-size update
-            loss /= ACCUM_STEPS 
+            loss /= ACCUM_STEPS
         scaler.scale(loss).backward()
         if i % ACCUM_STEPS == ACCUM_STEPS - 1:
             scaler.step(optimizer)
@@ -85,9 +91,9 @@ for epoch in range(2):
                 flush=True,
             )
 
-    # Flush any remaining gradients after the last batch 
+    # Flush any remaining gradients after the last batch
     # if it wasn't a multiple of ACCUM_STEPS
-    if len(loader) % ACCUM_STEPS != 0:    
+    if len(loader) % ACCUM_STEPS != 0:
         scaler.step(optimizer)
         scaler.update()
         optimizer.zero_grad()
@@ -96,4 +102,9 @@ for epoch in range(2):
     attr_acc, class_acc = evaluate(model, val_loader, device)
     print(f"Epoch {epoch}: train_loss={avg_loss:.4f}  val_class_acc={class_acc:.3f}")
     for attr, acc in attr_acc.items():
-        print(f"    {attr:28s} {acc:.3f}")    
+        print(f"    {attr:28s} {acc:.3f}")
+
+    if class_acc > best_acc:
+        best_acc = class_acc
+        torch.save(model.state_dict(), "checkpoints/best_model.pt")
+        print(f"Epoch {epoch}: saved new best model with val_class_acc={best_acc:.3f}")
