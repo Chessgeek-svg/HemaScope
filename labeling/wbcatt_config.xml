@@ -26,6 +26,15 @@
       <Choice value="densely"/>
     </Choices>
 
+    <!-- HemaScope addition, not part of the WB-CAtt schema: WB-CAtt is normal-cell
+         only (nucleoli ~always absent), so this column is blank on WB-CAtt rows and
+         must NOT enter vocab.ATTRIBUTE_VOCAB until those rows are backfilled. -->
+    <Header value="Nucleoli Present"/>
+    <Choices name="nucleoli_present" toName="image" choice="single" required="true">
+      <Choice value="yes"/>
+      <Choice value="no"/>
+    </Choices>
+
     <Header value="Nuclear-cytoplasmic Ratio"/>
     <Choices name="nuclear_cytoplasmic_ratio" toName="image" choice="single" required="true">
       <Choice value="high"/>
